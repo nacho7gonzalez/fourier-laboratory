@@ -1,0 +1,20 @@
+name: tf_ves
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - ipympl
+  - matplotlib
+  - pandas
+  - scikit-learn
+  - scipy
+  - ipykernel
+  - wfdb
+  - plotly
+  - nbformat
+  - notebook
+  - seaborn
+  - pip:
+      - bleak
+
+

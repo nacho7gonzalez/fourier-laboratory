@@ -1,0 +1,207 @@
+# HAR - Human Activity Recognition
+
+## Base de señales --------------------------------------------------------
+
+Datos tomados de 30 personas que realizaban diferentes actividades con un
+smartphone en la cintura.
+Datos registrados mediante acelerómetro y giroscopio a 50Hz.
+
+### Señales de Aceleración y Giro
+
+Cada archivo en formato CSV tiene las siguientes columnas:
+
+    [acc_x] aceleración en el eje X
+    [acc_y] aceleración en el eje Y
+    [acc_z] aceleración en el eje Z
+    [gyro_x] velocidad angular en torno al eje X
+    [gyro_y] velocidad angular en torno al eje Y
+    [gyro_z] velocidad angular en torno al eje Z
+    [label] etiqueta de actividad
+    [subject_id] identificador del sujeto realizando la actividad
+    [activity_name] nombre de la actividad
+
+Unidades de aceleracion: g
+Unidades de velocidad angular: rad/s
+
+### Etiquetas
+
+En el conjutno de datos, las etiquetas van del 1 al 6 como sigue:
+
+    CAMINANDO como 1
+    SUBIENDO ESCALERAS como 2
+    BAJANDO ESCALERAS como 3
+    SENTADO como 4
+    DE PIE como 5
+    ACOSTADO como 6
+
+### Partición de datos
+
+Entrenamiento - 70%
+Prueba - 30%
+
+## Carga e Inspección de los Datos ----------------------------------------
+
+### Carga de Datos Train y Test a DataFrame dePandas
+
+pd.read_csv('ruta', delimiter=',')
+
+### Separación de Gravedad y Aceleración Corporal
+
+Se aplica un filtro pasa-altos Butterworth a cada señal con fc = 0.2 Hz para
+elminar la componente constante de la aceleración gravitacional.
+Los datos se cargan donde corresponde: df_har_test["body_acc_'eje'"]
+									   df_har_train["body_acc_'eje'"]
+Los muestro con display(df_har_'train o test')
+
+## Cálculo de Características ---------------------------------------------
+
+Ventana muy grande ---> Poco precisa temporalmente, abarca distintas activ.
+Ventana muy chica ---> Impide entender bien las señales para determinar activ.
+
+Usamos ventanas de 2.5s a 5s
+
+
+### Cálculo de Características por Ventana
+
+Se calcula:
+	Energía por eje = np.sum(eje_acc**2)
+	Magnitud = np.sqrt(x_acc**2 + y_acc**2 + z_acc**2)
+	Media = np.mean(magnitud)
+	Desviación estándar = np.std(magnitud)
+
+Se agregan estas características en features con .append
+
+### Calcular las Características Sobre las Señales Body
+
+Se usa la función calcular_caracteristicas_por_ventana().
+Esto genera los conjuntos X_train, Y_train, X_test, Y_test
+
+## Clasificación ----------------------------------------------------------
+
+Se entrena y evalúa un clasificador de K-vecinos más cercanos(KNN())
+K = 5
+Distancia euclideana
+
+El clasificador se genera de la siguiente manera:
+	clasificador = KNN(n_neighbors=K)
+
+Para entrenar: clasificador.fit(X_train, Y_train)
+
+Para predecir: Y_pred = clasificador.predict(X_test)
+
+Evaluar desempeño: accuracy = accuracy_score(Y_test, Y_pred)
+
+### Principales aspectos del clasificador
+
+Clasifica un nuevo dato según las características de los K datos mas cercanos.
+Se basa en la proximidad entre el dato nuevo y los de entrenamiento.
+Elegimos distancia euclideana.
+K grande ---> Clasificador mas estable, pero mas costo computacional
+
+### Precisión vs Cantidad de Vecinos
+
+Mayor precisión alrededor de los 10 vecinos.
+Al aumentar K, empeora la precisión pues se pierden los detalles locales
+
+### Overfitting
+
+Ocurre cuando el modelo de AA se ajusta demasiado a los datos de
+entrenamiento, capturando incluso el ruido  las fluctuaciones aleatorias en
+esos datos.
+Esto hace que el modelo funcione muy bien con los datos en los quqe fue
+entrenado, pero tiene un rendimiento pobre cuando se enfrenta a nuevos datos.
+En otras palabras, el modelo no ha generalizado, sino que ha memorizado las
+características especificas de los datos de entrenamiento.
+
+### Validación cruzada
+
+Se usa para prevenir el overfitting. Se divide el conjunto de datos en varias
+partes (folds) y entrena el modelo varias veces en diferentes combinaciones
+de estas partes. Esto da una idea mas precisa del rendimiento del modelo en
+diferentes subconjuntos de datos y permite generalizar mejor a nuevos datos.
+
+n folds ---> n-1 folds como enrenaiento y el restante como validación
+repito n veces
+
+### Busqueda del Mejor K
+
+Se crea una grilla de busquqeda usando GridSearchCV.
+Luego usando la funcion .fit(X_train, Y_train), se procede a encontrar el
+mejor K con .best_params['n_neighbors']
+
+### Medidas de Performance
+
+classification_report(Y_test, Y_pred) genera un reporte con las siguientes
+metricas:
+
+precision: Proporcion de predicciones positivas correctas sobre la cantidad
+			total de positivos (TP / (TP+FP))
+
+Recall: Proporcion de casos reales positivos detectados sobre el total de
+		casos reales (TP / (TP+FN))
+
+F1-score: Media armónica entre precision y recall
+			(2 * precision * recall) / (precision + recall)
+
+
+Support: Cantitad de muestras de cada clase en el conjunto de prueba
+
+Accuracy: % total de aciertos ((TP+TN) / Total)
+
+Macro_avg: Promedio entre todos los elementos de una columna
+
+Weighted_avg: Promedio ponderado por el número de muestras (support) de cada
+				clase
+
+### Matriz de Confusión
+
+Matriz que muestra el numero de predicciones correctas e incorrectas,
+desglosando los resultados en TP, FP, TN y FN.
+
+Cada fila de la matriz corresponde a una característica real, mientras que las
+columnas corresponden a la predicción del modelo. Los valores en la diagonal
+son los aciertos del clasificador.
+
+El classification_report indica la informacion de cada fila de la matriz
+
+## Otros Clasficadores ----------------------------------------------------
+
+### Random Forest
+
+Utiliza varios árboles de decisión, los cuales son entrenados con diferentes
+subconjuntos de los dats de entrenamiento asignados.
+La predicción del clasificador se obtiene al calcular la predicción de cada
+árbol y tomar la más popular entre todas.
+
+n_estimators = numero de árboles
+max_depth = profundidad maxima del árbol
+
+Se entrena y predice igual que en KNN, con .fit y .predict
+
+## Prueba con Otras Características ---------------------------------------
+
+### Nueva Función de Cálculo de Características por Ventana
+
+Misma funcion pero ahora se calculan las características sobre todas las
+señales.
+
+...
+
+### Importancia de las Características
+
+Random Forest tiene la funcion .feature_importances_ que de las
+características con las que se genera eclasificador, te indica con numeros
+flotantes la importancia de cada una a la hora de clasificar, es decir, 
+las características que mas afecta la decisión
+
+### Selección de Características
+
+.SelectKBest() selecciona características basandose en los mejores scores del
+parámetro K
+
+
+## Competencia ------------------------------------------------------------
+
+Random Forest
+.best_params_ y .best_score_
+
